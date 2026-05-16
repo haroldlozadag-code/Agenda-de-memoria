@@ -1749,422 +1749,409 @@ function renderColorGrid() {
   });
 }
 
-// ==================== VOICE — v2.2 CON DICCIONARIO ====================
-const VOICE_LANGS = ['es-419', 'es-MX', 'es-CO', 'es-ES', 'es-US']; // español Latam primero
+// ==================== VOICE — v2.3 SIN DUPLICACIONES ====================
+
+const VOICE_LANGS = ['es-419', 'es-MX', 'es-CO', 'es-ES', 'es-US'];
+
 let voiceLangIndex = 0;
-let voiceTranscript = '';
-let voiceBaseText = ''; // texto que ya estaba antes de iniciar (para acumular)
-let voiceRetryCount = 0;
+
+let voiceBaseText = '';
+
+let voiceLastTranscript = '';
+
 let voiceDiagLog = [];
 
-// ==== DICCIONARIO DE CORRECCIONES ====
-// Formato: cada entrada es [palabra_correcta, [variantes_que_dice_chrome]]
-// Las búsquedas son case-insensitive y respetan palabras completas
-const VOICE_DICTIONARY = [
-  // Normativa y gestión
-  ['RETIE', ['retiré', 'retire', 'retiro', 're tie', 'reti', 'retee', 'rey tie']],
-  ['RETILAP', ['retilab', 'reti lap', 'retil ap', 'retil app', 'reti lab']],
-  ['NTC', ['n t c', 'enteceé', 'enteceee', 'en te ce', 'ene te ce']],
-  ['NTC 2050', ['ntc dos mil cincuenta', 'ene te ce 2050', 'n t c 2050']],
-  ['APU', ['a p u', 'hapu', 'ap u', 'a pu']],
-  ['APUs', ['a p u s', 'hapus']],
-  ['AIU', ['a i u', 'a yu', 'ahí u']],
-  ['SMLMV', ['s m l m v', 'eseme', 'ese mlmv']],
-  ['interventoría', ['interventores', 'interventor', 'interventoria', 'interventorías']],
-  ['gerencia', ['herencia']],
 
-  // Magnitudes
-  ['voltaje', ['boltaje', 'voltage']],
-  ['amperios', ['amperios', 'amperaje', 'ampere']],
-  ['ohmios', ['ojos', 'omios', 'omnios']],
-  ['vatios', ['watts', 'watios', 'vates']],
-  ['kilovatios', ['kilo vatios', 'kw', 'kilowatts']],
-  ['kVA', ['k v a', 'kva', 'cabea']],
-  ['kWh', ['k w h', 'kwh', 'kilowatt hora']],
-  ['frecuencia', ['frecuencia', 'frecuencias']],
-  ['impedancia', ['impedancia', 'inpedancia']],
-  ['reactancia', ['reactancia']],
-  ['capacitancia', ['capacitancia']],
-  ['inductancia', ['inductancia', 'inductan cia']],
-  ['factor de potencia', ['factor de potencia']],
-
-  // Sistemas
-  ['monofásico', ['mono fásico', 'monofasico', 'mono fasico']],
-  ['bifásico', ['bi fásico', 'bifasico']],
-  ['trifásico', ['tri fásico', 'trifasico', 'tri fasico']],
-  ['neutro', ['neutro']],
-  ['armónicos', ['armonicos', 'harmónicos', 'armónico']],
-
-  // Conductores y cableado
-  ['conductor', ['conductor']],
-  ['calibre', ['calibre', 'caliber']],
-  ['ampacidad', ['ambacidad', 'ampacida', 'amplicidad', 'ampacida']],
-  ['THHN', ['te hache hache ene', 't h h n']],
-  ['THWN', ['te hache w ene', 't h w n']],
-  ['XHHW', ['equis hache hache w', 'x h h w']],
-  ['bandeja', ['bandeja', 'bandejas']],
-  ['conduit', ['conduit', 'conduid', 'condui']],
-  ['EMT', ['e m t', 'emté']],
-  ['IMC', ['i m c']],
-  ['PVC', ['p v c', 'pevece']],
-  ['acometida', ['acometida', 'a cometida']],
-  ['alimentador', ['alimentador']],
-  ['ducteria', ['ducteria', 'ductería', 'ductería']],
-  ['ductería', ['ducteria', 'ductería', 'ducteria']],
-  ['unifilar', ['uni filar', 'unificar', 'unifilare', 'únifilar', 'uni-filar']],
-
-  // Protecciones
-  ['breaker', ['breaker', 'breakers', 'brake', 'breik']],
-  ['totalizador', ['totalizador']],
-  ['diferencial', ['diferencial']],
-  ['DDR', ['d d r', 'deder']],
-  ['GFCI', ['g f c i']],
-  ['fusible', ['fusible', 'fusibles']],
-  ['DPS', ['d p s', 'depés']],
-  ['relé', ['rele', 'relé']],
-  ['curva', ['curva']],
-  ['selectividad', ['selectividad']],
-  ['coordinación', ['coordinacion', 'cordinación']],
-  ['cortocircuito', ['corto circuito', 'cortocircuito']],
-  ['sobrecarga', ['sobre carga', 'sobrecarga']],
-  ['sobretensión', ['sobre tensión', 'sobretension']],
-  ['subtensión', ['sub tensión', 'subtension']],
-
-  // Puesta a tierra
-  ['SPT', ['s p t', 'espeté']],
-  ['copperweld', ['cooperweld', 'cooper weld', 'cooperwell']],
-  ['equipotencialización', ['equipotencializacion']],
-  ['apantallamiento', ['a pantallamiento', 'apantallamientos']],
-  ['SPDA', ['s p d a']],
-  ['LPS', ['l p s']],
-  ['pararrayos', ['para rayos', 'pararayos']],
-
-  // Equipos
-  ['transformador', ['trans formador', 'transformador']],
-  ['subestación', ['sub estación', 'subestacion']],
-  ['tablero', ['tablero', 'tableros']],
-  ['CCM', ['c c m']],
-  ['VFD', ['v f d']],
-  ['variador', ['variador']],
-  ['contactor', ['contactor']],
-  ['UPS', ['u p s', 'upes']],
-  ['ATS', ['a t s']],
-
-  // Iluminación
-  ['luminaria', ['luminaria', 'luminarias']],
-  ['lúmenes', ['lumenes', 'lumens']],
-  ['IRC', ['i r c']],
-  ['UGR', ['u g r']],
-  ['balasto', ['balasto', 'balastos']],
-
-  // Diseño
-  ['diagrama unifilar', ['diagrama uni filar', 'diagrama unificar', 'diagrama unifilare']],
-  ['cuadro de cargas', ['cuadro de cargas']],
-  ['memoria de cálculo', ['memoria de calculo']],
-  ['caída de tensión', ['caida de tension']],
-
-  // Marcas
-  ['Schneider', ['schneider', 'esnaider', 'esneider', 'snaider', 'sneider', 'esnaider']],
-  ['Centelsa', ['centelsa', 'sentelsa', 'sentelza', 'centelza']],
-  ['Pavco', ['pavco', 'pabco', 'papco']],
-  ['Panduit', ['panduit', 'panduid', 'pan duit', 'pan duid']],
-  ['Corona', ['corona']],
-  ['Grival', ['grival', 'gribal']],
-  ['Sika', ['sika', 'sica']],
-  ['Legrand', ['legrand', 'le grand', 'legran']],
-  ['ABB', ['a b b', 'abbe']],
-  ['Siemens', ['siemens', 'simens']],
-
-  // Proyectos
-  ['Nodo de Seguridad', ['nodo de seguridad', 'nodo seguridad']],
-  ['Nodo Seguridad EPM', ['nodo seguridad e p m']],
-  ['EPM', ['e p m', 'epem', 'epee eme', 'epé eme']],
-  ['San Vicente', ['san vicente', 'sanvicente', 'san bicente']],
-  ['San Vicente Fundación', ['san vicente fundacion', 'sanvicente fundacion']],
-  ['Hotel Movich', ['hotel movich', 'movich', 'mobic', 'movic']],
-  ['Movich', ['movich', 'mobic', 'movic', 'mobich']],
-  ['EDU', ['e d u', 'edú']],
-  ['Colegio Francisco Miranda', ['colegio francisco miranda', 'francisco miranda']],
-  ['Francisco Miranda', ['francisco miranda']],
-  ['CRUE', ['c r u e', 'crúe', 'cruel', 'cruee']],
-
-  // Personas — familia y contactos frecuentes
-  ['Juan Granados', ['juan granados', 'juan granado', 'juangranados']],
-  ['Granados', ['granados', 'granado']],
-  ['Bibiana', ['bibiana', 'biviana', 'viviana']],
-  ['Diana', ['diana', 'diane']],
-  ['Laura', ['laura']],
-  ['Edwin', ['edwin', 'edwing', 'edwin', 'eduin']],
-  ['Andrés', ['andres', 'andrés', 'andre']],
-  ['Robin', ['robin', 'robín']],
-  ['Hugo', ['hugo', 'ugo']],
-  ['Elkin', ['elkin', 'elquin', 'elkin']],
-  ['Elizabeth', ['elizabeth', 'elisabet', 'elizabet']],
-  ['Yenifer', ['yenifer', 'jenifer', 'jennifer', 'jeniffer']],
-  ['Ema', ['ema', 'emma']],
-  ['Vanesa', ['vanesa', 'vanessa']],
-  ['Sebastián', ['sebastian', 'sebastián']],
-  ['Juliana', ['juliana']],
-  ['Fredy', ['fredy', 'freddy', 'fredi']],
-  ['Junior', ['junior', 'yunior']],
-  ['Eduard', ['eduard', 'eduart', 'eduardo']],
-  ['Hilda', ['hilda', 'ilda']],
-  ['Melisa', ['melisa', 'melissa']],
-  ['Isabel', ['isabel', 'ysabel']],
-  ['Julián', ['julian', 'julián']],
-  ['Erika', ['erika', 'erica']],
-  ['Sandra', ['sandra']],
-  ['Paula', ['paula']],
-
-  // Horas en español
-  ['9 a.m.', ['nueve a m', 'nueve de la mañana', '9 a m']],
-  ['10 a.m.', ['diez a m', 'diez de la mañana', '10 a m']],
-  ['11 a.m.', ['once a m', 'once de la mañana', '11 a m']],
-  ['12 p.m.', ['doce m', 'doce p m', 'mediodía', '12 p m']],
-  ['1 p.m.', ['una p m', 'una de la tarde', '1 p m']],
-  ['2 p.m.', ['dos p m', 'dos de la tarde', '2 p m']],
-  ['3 p.m.', ['tres p m', 'tres de la tarde', '3 p m']],
-  ['4 p.m.', ['cuatro p m', 'cuatro de la tarde', '4 p m']],
-  ['5 p.m.', ['cinco p m', 'cinco de la tarde', '5 p m']],
-  ['6 p.m.', ['seis p m', 'seis de la tarde', '6 p m']],
-  ['7 p.m.', ['siete p m', 'siete de la noche', '7 p m']],
-  ['8 p.m.', ['ocho p m', 'ocho de la noche', '8 p m']],
-];
-
-function applyDictionary(text) {
-  if (!text) return text;
-  let result = text;
-
-  VOICE_DICTIONARY.forEach(([correct, variants]) => {
-    variants.forEach(variant => {
-      // No reemplazar si la variante es BYTE-A-BYTE igual a la correcta (evita loops infinitos)
-      if (variant === correct) return;
-
-      const escaped = variant.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const re = new RegExp('(?<![a-záéíóúñü0-9])' + escaped + '(?![a-záéíóúñü0-9])', 'gi');
-      result = result.replace(re, correct);
-    });
-  });
-
-  // Capitalización inteligente para nombres propios: si una palabra del diccionario aparece
-  // en lowercase, la convertimos a su forma correcta
-  VOICE_DICTIONARY.forEach(([correct]) => {
-    if (!/[A-ZÁÉÍÓÚÑ]/.test(correct)) return; // Solo si el correcto tiene mayúscula
-    const escaped = correct.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const re = new RegExp('(?<![a-záéíóúñü0-9])' + escaped + '(?![a-záéíóúñü0-9])', 'gi');
-    result = result.replace(re, correct);
-  });
-
-  // Capitalizar después de punto
-  result = result.replace(/(^|\.\s+)([a-záéíóúñ])/g, (m, p1, p2) => p1 + p2.toUpperCase());
-
-  // Primera letra siempre mayúscula
-  if (result.length > 0) {
-    result = result.charAt(0).toUpperCase() + result.slice(1);
-  }
-
-  return result;
-}
 
 function voiceLog(msg, isError) {
+
   const time = new Date().toLocaleTimeString('es-CO', {hour12:false});
+
   const entry = `[${time}] ${isError ? '⚠ ' : '· '}${msg}`;
+
   voiceDiagLog.push(entry);
+
   if (voiceDiagLog.length > 15) voiceDiagLog.shift();
+
   const diag = document.getElementById('voiceDiagnostic');
+
   if (diag) {
+
     diag.innerHTML = voiceDiagLog.map(e =>
+
       `<div style="color:${e.includes('⚠') ? 'var(--urgent)' : 'var(--ink-2)'};">${e}</div>`
+
     ).join('');
+
     diag.scrollTop = diag.scrollHeight;
+
   }
+
 }
+
+
 
 function showDiagnostic(show) {
+
   const diag = document.getElementById('voiceDiagnostic');
+
   if (diag) diag.style.display = show ? 'block' : 'none';
+
 }
+
+
 
 function detectVoiceSupport() {
+
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) return { available: false, reason: 'no-api', msg: 'Tu navegador no soporta dictado por voz. Usa Chrome.' };
+
+  if (!SR) return { available: false, reason: 'no-api', msg: 'Tu navegador no soporta dictado por voz.' };
+
   if (isLocalFile) return { available: false, reason: 'file-protocol', msg: '⚠ La voz NO funciona abriendo el archivo directo.' };
+
   if (!isSecureContext) return { available: false, reason: 'insecure', msg: '⚠ La voz requiere HTTPS.' };
-  return { available: true, reason: 'ok', msg: 'Toca el micrófono. Habla claro. Las palabras técnicas se corrigen solas.' };
+
+  return { available: true, reason: 'ok', msg: 'Toca 🎤, espera 1 segundo y habla claro.' };
+
 }
+
+
 
 function updateVoiceHint() {
+
   const support = detectVoiceSupport();
+
   const hint = document.getElementById('voiceHint');
+
   const btn = document.getElementById('voiceBtn');
+
   hint.textContent = support.msg;
+
   hint.className = 'voice-hint' + (support.available ? '' : ' warn');
+
   if (!support.available) btn.classList.add('disabled');
+
   else btn.classList.remove('disabled');
+
 }
 
+
+
 function buildRecognition(lang) {
+
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+
   if (!SR) return null;
 
+
+
   const rec = new SR();
+
   rec.lang = lang;
-  rec.continuous = true; // MODO CONTINUO — frases más largas
+
+  rec.continuous = false; // SIMPLE — sin duplicaciones
+
   rec.interimResults = true;
-  rec.maxAlternatives = 3; // Más alternativas — mejor corrección
+
+  rec.maxAlternatives = 1;
+
+
 
   rec.onstart = () => voiceLog(`Escuchando en ${lang}...`);
 
+
+
   rec.onresult = (e) => {
+
     let interim = '';
+
     let final = '';
+
     for (let i = 0; i < e.results.length; i++) {
+
       const transcript = e.results[i][0].transcript;
+
       if (e.results[i].isFinal) final += transcript;
+
       else interim += transcript;
+
     }
+
+
 
     const rawText = (final || interim).trim();
+
+    if (!rawText) return;
+
+
+
+    // Filtrar duplicados consecutivos
+
+    if (rawText === voiceLastTranscript) return;
+
+    voiceLastTranscript = rawText;
+
+
+
     const correctedText = applyDictionary(rawText);
 
-    // Combinar texto base + nuevo
+
+
+    // Texto base + nuevo (acumular si había algo antes)
+
     const fullText = voiceBaseText
+
       ? (voiceBaseText + ' ' + correctedText).trim()
+
       : correctedText;
 
-    voiceTranscript = correctedText;
+
+
     document.getElementById('inpTitle').value = fullText;
 
-    if (rawText && rawText !== correctedText) {
+
+
+    if (rawText !== correctedText) {
+
       voiceLog(`📝 "${rawText}" → "${correctedText}"`);
-    } else if (rawText) {
+
+    } else {
+
       voiceLog(`📝 "${rawText}"`);
+
     }
+
   };
+
+
 
   rec.onerror = (e) => {
+
     voiceLog(`Error: ${e.error}`, true);
+
     if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+
       alert('⚠ Permiso denegado. Toca el candado 🔒 → Permisos → Micrófono → Permitir.');
+
       stopVoice();
+
     } else if (e.error === 'language-not-supported') {
+
       voiceLangIndex++;
+
       if (voiceLangIndex < VOICE_LANGS.length) {
-        voiceLog(`Probando ${VOICE_LANGS[voiceLangIndex]}...`);
+
         setTimeout(() => tryStartRecognition(), 200);
+
       } else {
+
         stopVoice();
+
       }
+
     } else if (e.error === 'no-speech') {
-      voiceLog('Sin voz detectada — habla más fuerte', true);
+
+      voiceLog('Sin voz detectada', true);
+
+      stopVoice();
+
     } else if (e.error === 'audio-capture') {
+
       alert('⚠ No accede al micrófono.');
+
       stopVoice();
+
     } else if (e.error === 'network') {
+
       alert('⚠ El dictado necesita internet activo.');
+
       stopVoice();
+
     } else if (e.error === 'aborted') {
-      // No alertar, fue intencional
+
+      // Silencioso
+
     }
+
   };
+
+
 
   rec.onend = () => {
-    voiceLog('Reconocimiento finalizado');
-    if (isRecording) {
-      // En modo continuo a veces el reconocedor se reinicia solo; si seguimos grabando, reintentar
-      if (voiceTranscript) {
-        stopVoice();
-      } else if (voiceRetryCount < 1) {
-        voiceRetryCount++;
-        setTimeout(() => tryStartRecognition(), 300);
-      } else {
-        stopVoice();
-      }
-    }
+
+    voiceLog('Finalizado');
+
+    stopVoice();
+
   };
 
+
+
   return rec;
+
 }
+
+
 
 function tryStartRecognition() {
+
   if (voiceLangIndex >= VOICE_LANGS.length) {
+
     stopVoice();
+
     return;
+
   }
+
+
 
   const lang = VOICE_LANGS[voiceLangIndex];
+
   recognition = buildRecognition(lang);
+
   if (!recognition) { stopVoice(); return; }
 
+
+
   try {
+
     recognition.start();
+
     isRecording = true;
+
     document.getElementById('voiceBtn').classList.add('recording');
+
     document.getElementById('voiceBtn').textContent = '●';
+
   } catch (e) {
-    voiceLog(`Error al iniciar: ${e.message}`, true);
+
+    voiceLog(`Error: ${e.message}`, true);
+
     if (e.message && e.message.includes('already started')) {
+
       try { recognition.stop(); } catch (ee) {}
+
       setTimeout(() => tryStartRecognition(), 500);
+
     } else {
+
       stopVoice();
+
     }
+
   }
+
 }
 
+
+
 async function startVoice() {
+
   const support = detectVoiceSupport();
+
   if (!support.available) {
+
     alert(support.msg);
+
     return;
+
   }
 
-  // Guardar texto existente para acumular (no borrar lo que ya hay)
+
+
   voiceBaseText = (document.getElementById('inpTitle').value || '').trim();
 
   voiceDiagLog = [];
-  voiceTranscript = '';
+
+  voiceLastTranscript = '';
+
   voiceLangIndex = 0;
-  voiceRetryCount = 0;
+
   showDiagnostic(true);
-  voiceLog('Iniciando dictado...');
-  if (voiceBaseText) voiceLog(`Acumulando sobre: "${voiceBaseText}"`);
+
+  voiceLog('Iniciando...');
+
+  if (voiceBaseText) voiceLog(`Acumulando: "${voiceBaseText}"`);
+
+
 
   try {
+
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
       stream.getTracks().forEach(t => t.stop());
+
     }
+
   } catch (err) {
-    voiceLog(`Error de permiso: ${err.name}`, true);
-    alert('⚠ Necesito permiso del micrófono. Toca el candado 🔒 → Permisos.');
+
+    voiceLog(`Permiso denegado: ${err.name}`, true);
+
+    alert('⚠ Permite el micrófono. Toca candado 🔒 → Permisos.');
+
     return;
+
   }
 
-  tryStartRecognition();
+
+
+  // Pausa de 400ms antes de arrancar — da tiempo a que Chrome inicialice
+
+  // y el usuario alcance a empezar a hablar sin perder la primera palabra
+
+  voiceLog('Preparando... habla ahora');
+
+  setTimeout(() => tryStartRecognition(), 400);
+
 }
+
+
 
 function stopVoice() {
+
   if (recognition) {
+
     try { recognition.stop(); } catch (e) {}
+
     try { recognition.abort(); } catch (e) {}
+
   }
+
   isRecording = false;
+
   const btn = document.getElementById('voiceBtn');
+
   if (btn) {
+
     btn.classList.remove('recording');
+
     btn.textContent = '🎤';
+
   }
+
   setTimeout(() => showDiagnostic(false), 5000);
+
 }
 
+
+
 function initVoice() {
+
   const support = detectVoiceSupport();
+
   if (!support.available) {
+
     const btn = document.getElementById('voiceBtn');
+
     if (btn) btn.classList.add('disabled');
+
   }
+
 }
+
+
 
 // ==================== HOSTING WARNING ====================
 function renderHostingWarning() {
